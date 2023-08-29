@@ -59,3 +59,13 @@ int main(int argc, char *argv[]) {
         printf("Erro\n");
         return 1;
     }
+}
+
+void Set_Stats(CacheStats *stats, int total_accesses, int hits, int comp_misses, int cap_misses, int conf_misses) {
+    stats->acessos = acessos;
+    stats->hits = hits;
+    stats->comp_misses = comp_misses;
+    stats->cap_misses = cap_misses;
+    stats->conf_misses = conf_misses;
+    stats->misses = comp_misses + cap_misses + conf_misses;
+}
