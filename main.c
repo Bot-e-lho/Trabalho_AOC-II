@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    CacheStats stats = {0};
     int nsets = atoi(argv[1]);
     int bsize = atoi(argv[2]);
     int assoc = atoi(argv[3]);
