@@ -38,7 +38,7 @@ typedef struct CacheStats {
 
 void setStats(CacheStats *stats, int total_accesses, int hits, int comp_misses, int cap_misses, int conf_misses);
 uint32_t reverseAddress(int address);
-void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffset, int numBitsIndex, CacheStats stats);
+void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffset, int numBitsIndex, CacheStats *stats);
 
 
 int main(int argc, char *argv[]) {
@@ -66,14 +66,25 @@ int main(int argc, char *argv[]) {
     int numBitsIndex = log2(nsets);
     int numBitsTag = 32 - numBitsOffset - numBitsIndex;
 
-    loadAdresses(cache, nsets, assoc, file, numBitsOffset, numBitsIndex, stats);
+    loadAdresses(cache, nsets, assoc, file, numBitsOffset, numBitsIndex, &stats);
 
+    float hitRate = (float)stats.hits/(float)stats.acessos;
+    float missRate = (float)stats.misses/(float)stats.acessos;
+    float compMissRate = (float)stats.comp_misses/(float)stats.misses;
+    float capMissRate = (float)stats.cap_misses/(float)stats.misses;
+    float confMissRate = (float)stats.conf_misses/(float)stats.misses;
+
+    printf("Acessos: %d\n", stats.acessos);
+    printf("Taxa de Hits: %.2f\n", hitRate);
+    printf("Taxa de Misses: %.2f\n", missRate);
+    printf("Taxa de Misses Compulsorios: %.2f\n", compMissRate);
+    printf("Taxa de Misses Capacidade: %.2f\n", capMissRate);
+    printf("Taxa de Misses Conflito: %.2f\n", confMissRate);
 }
 
-void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffset, int numBitsIndex, CacheStats stats){
+void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffset, int numBitsIndex, CacheStats *stats){
 
     Conj blocos;
-    int missFlag = 1;
 
     cache.conjs = malloc(sizeof(Conj) * nsets); // nsets
     for (int i = 0; i < nsets; i++){
@@ -97,22 +108,30 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
         address = reverseAddress(address);
         TAG = address >> (numBitsOffset + numBitsIndex);
         IDX = (address >> numBitsOffset) & ((int)(pow(2, numBitsIndex)-1));
+        stats->acessos++;
 
-        for (int i = 0; i < assoc; i++){
-            if (cache.conjs[IDX].blocos[i].val == 1){
-                if (cache.conjs[IDX].blocos[i].tag == TAG){
-                    stats.hits++;
-                    missFlag = 0;
-                    break;
+        if (assoc == 1){        // Mapeamento Direto
+            if (cache.conjs[IDX].blocos[0].val == 1){
+                if (cache.conjs[IDX].blocos[0].tag == TAG){  // TAG bateu
+                    stats->hits++;
+                }
+                else{  // TAG não bateu
+                    stats->conf_misses++;
+                    stats->misses++;
+                    cache.conjs[IDX].blocos[0].tag = TAG;
                 }
             }
-        }
-        if (missFlag){
-            // ...
+            else{       // Validade = 0
+                stats->comp_misses++;
+                stats->misses++;
+                cache.conjs[IDX].blocos[0].val = 1;
+                cache.conjs[IDX].blocos[0].tag = TAG;
+            }
         }
     }
 
     fclose(arq);
+    return;
 }
 
 
