@@ -36,14 +36,15 @@ typedef struct CacheStats {
 } CacheStats;
 
 
-void setStats(CacheStats *stats, int total_accesses, int hits, int comp_misses, int cap_misses, int conf_misses);
+void setStats(CacheStats *stats, int acessos, int hits, int comp_misses, int cap_misses, int conf_misses);
 uint32_t reverseAddress(int address);
 void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffset, int numBitsIndex, CacheStats *stats);
+void display ( int flag, CacheStats *cache );
 
 
 int main(int argc, char *argv[]) {
     if (argc != 7) {
-        printf("Padrao utilizado: <nsets> <bsize> <assoc> <substituição> <flag_saida> arquivo_de_entrada\n");
+        printf("Padrao utilizado:\n <nsets> <bsize> <assoc> <substituição> <flag_saida> arquivo_de_entrada\n");
         return 1;
     }
 
@@ -66,7 +67,7 @@ int main(int argc, char *argv[]) {
     int numBitsIndex = log2(nsets);
     int numBitsTag = 32 - numBitsOffset - numBitsIndex;
 
-    loadAdresses(cache, nsets, assoc, file, numBitsOffset, numBitsIndex, &stats);
+    loadAdresses( cache, nsets, assoc, file, numBitsOffset, numBitsIndex, &stats );
 
     float hitRate = (float)stats.hits/(float)stats.acessos;
     float missRate = (float)stats.misses/(float)stats.acessos;
@@ -136,8 +137,8 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
 
 
 
-void setStats(CacheStats *stats, int total_accesses, int hits, int comp_misses, int cap_misses, int conf_misses) {
-    stats->acessos = total_accesses;
+void setStats(CacheStats *stats, int acessos, int hits, int comp_misses, int cap_misses, int conf_misses) {
+    stats->acessos = acessos;
     stats->hits = hits;
     stats->comp_misses = comp_misses;
     stats->cap_misses = cap_misses;
@@ -155,4 +156,22 @@ uint32_t reverseAddress(int address) {
     reversed |= ((address>>(24))&(mask>>(6*4)));
 
     return reversed;
+}
+
+void display ( int flag, CacheStats *cache ) {
+    if ( flag == 0 ) {
+        printf("Acessos = %d\n", cache->acessos);
+        printf("Taxa de hits = %.2f\n", (float)cache->hits / cache->acessos);
+        printf("Taxa de miss = %.2f\n", (float)cache->misses / cache->acessos);
+        printf("Taxa de miss compulsorio = %.2f\n", (float)cache->comp_misses / cache->acessos);
+        printf("Taxa de miss de capacidade = %.2f\n", (float)cache->cap_misses / cache->acessos);
+        printf("Taxa de miss de conflito = %.2f\n", (float)cache->conf_misses / cache->acessos);
+    } else if ( flag == 1 ) {
+        printf( "%d, %.2f, %.2f, %.2f, %.2f, %.2f\n", cache->acessos,
+               (float)cache->hits / cache->acessos,
+               (float)cache->misses / cache->acessos,
+               (float)cache->comp_misses / cache->acessos,
+               (float)cache->cap_misses / cache->acessos,
+               (float)cache->conf_misses / cache->acessos  );
+    }
 }
