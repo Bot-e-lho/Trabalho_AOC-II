@@ -5,9 +5,12 @@
 #include <stdint.h>
 #include <math.h>
 
-int OFF;
-int IDX;
-int TAG;
+#define MAX_UINT 4294967295
+
+unsigned int OFF;
+unsigned int IDX;
+unsigned int TAG;
+
 
 typedef struct Bloco {
     unsigned int val;
@@ -36,19 +39,25 @@ typedef struct CacheStats {
 } CacheStats;
 
 
-void setStats(CacheStats *stats, int acessos, int hits, int comp_misses, int cap_misses, int conf_misses);
-uint32_t reverseAddress(int address);
+unsigned int reverseAddress(int address);
 void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffset, int numBitsIndex, CacheStats *stats);
-void display ( int flag, CacheStats *cache );
+void printResults(int flag, CacheStats stats);
+int randInt(int max);
+
 
 
 int main(int argc, char *argv[]) {
     if (argc != 7) {
-        printf("Padrao utilizado:\n <nsets> <bsize> <assoc> <substituição> <flag_saida> arquivo_de_entrada\n");
+        printf("Padrao utilizado: <nsets> <bsize> <assoc> <substituição> <flag_saida> <arquivo_de_entrada>\n");
+        return 1;
+    }
+    if (argv[4][0] != 'R'){
+        printf("Apenas a politica de substituicao RANDOM foi implementada.");
         return 1;
     }
 
     CacheStats stats = {0};
+    srand(time(NULL));
     
     int nsets = atoi(argv[1]);
     int bsize = atoi(argv[2]);
@@ -56,6 +65,7 @@ int main(int argc, char *argv[]) {
     char subst = argv[4][0];
     int flag_saida = atoi(argv[5]);
     char *file = argv[6];
+
 
     Cache cache;
     cache.nsets = nsets;
@@ -67,31 +77,22 @@ int main(int argc, char *argv[]) {
     int numBitsIndex = log2(nsets);
     int numBitsTag = 32 - numBitsOffset - numBitsIndex;
 
-    loadAdresses( cache, nsets, assoc, file, numBitsOffset, numBitsIndex, &stats );
+    loadAdresses(cache, nsets, assoc, file, numBitsOffset, numBitsIndex, &stats);
+    printResults(flag_saida, stats);
 
-    float hitRate = (float)stats.hits/(float)stats.acessos;
-    float missRate = (float)stats.misses/(float)stats.acessos;
-    float compMissRate = (float)stats.comp_misses/(float)stats.misses;
-    float capMissRate = (float)stats.cap_misses/(float)stats.misses;
-    float confMissRate = (float)stats.conf_misses/(float)stats.misses;
-
-    printf("Acessos: %d\n", stats.acessos);
-    printf("Taxa de Hits: %.2f\n", hitRate);
-    printf("Taxa de Misses: %.2f\n", missRate);
-    printf("Taxa de Misses Compulsorios: %.2f\n", compMissRate);
-    printf("Taxa de Misses Capacidade: %.2f\n", capMissRate);
-    printf("Taxa de Misses Conflito: %.2f\n", confMissRate);
 }
 
 void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffset, int numBitsIndex, CacheStats *stats){
 
     Conj blocos;
+    int ranIdx;
+    int tagMissFlag = 1;
 
     cache.conjs = malloc(sizeof(Conj) * nsets); // nsets
     for (int i = 0; i < nsets; i++){
         cache.conjs[i].blocos = (Bloco*)malloc(sizeof(Bloco) * assoc); // assoc
         for (int j = 0; j < assoc; j++){
-            cache.conjs[i].blocos[j].tag = -1;
+            cache.conjs[i].blocos[j].tag = MAX_UINT;
             cache.conjs[i].blocos[j].val = 0;
         }
     }
@@ -106,6 +107,7 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
     unsigned int address;
 
     while (fread(&address, 4, 1, arq) == 1){
+        tagMissFlag = 1;
         address = reverseAddress(address);
         TAG = address >> (numBitsOffset + numBitsIndex);
         IDX = (address >> numBitsOffset) & ((int)(pow(2, numBitsIndex)-1));
@@ -129,6 +131,39 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
                 cache.conjs[IDX].blocos[0].tag = TAG;
             }
         }
+        
+        else{         // Conjunto Associativo
+            for (int i = 0; i < assoc; i++){
+                if (cache.conjs[IDX].blocos[i].val == 1){
+                    if (cache.conjs[IDX].blocos[i].tag == TAG){   // TAG bateu
+                        stats->hits++;
+                        tagMissFlag = 0;
+                        break;
+                    }
+                }
+                else{   // Validade = 0, primeira validade 0, para direita está tudo 0 também
+                    stats->comp_misses++;
+                    stats->misses++;
+                    cache.conjs[IDX].blocos[i].val = 1;
+                    cache.conjs[IDX].blocos[i].tag = TAG;
+                    tagMissFlag = 0;
+                    break;
+                }
+
+            }
+            if (tagMissFlag){       // Nenhuma TAG bateu, sai aleatório
+                ranIdx = randInt(assoc);
+                cache.conjs[IDX].blocos[ranIdx].tag = TAG;
+                stats->misses++;
+                if (nsets == 1){
+                    stats->cap_misses++;
+                }
+                else{
+                    stats->conf_misses++;
+                }
+            }
+        }
+    
     }
 
     fclose(arq);
@@ -136,19 +171,36 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
 }
 
 
+void printResults(int flag, CacheStats stats){
 
-void setStats(CacheStats *stats, int acessos, int hits, int comp_misses, int cap_misses, int conf_misses) {
-    stats->acessos = acessos;
-    stats->hits = hits;
-    stats->comp_misses = comp_misses;
-    stats->cap_misses = cap_misses;
-    stats->conf_misses = conf_misses;
-    stats->misses = comp_misses + cap_misses + conf_misses;
+    float hitRate = (float)stats.hits/(float)stats.acessos;
+    float missRate = (float)stats.misses/(float)stats.acessos;
+    float compMissRate = (float)stats.comp_misses/(float)stats.misses;
+    float capMissRate = (float)stats.cap_misses/(float)stats.misses;
+    float confMissRate = (float)stats.conf_misses/(float)stats.misses;
+
+    if (flag == 0){
+        printf("Acessos: %d\n", stats.acessos);
+        printf("Taxa de Hits: %.2f\n", hitRate);
+        printf("Taxa de Misses: %.2f\n", missRate);
+        printf("Taxa de Misses Compulsorios: %.2f\n", compMissRate);
+        printf("Taxa de Misses Capacidade: %.2f\n", capMissRate);
+        printf("Taxa de Misses Conflito: %.2f\n", confMissRate);
+    }
+    else{
+        printf("%d, %.4f, %.4f, %.4f, %.4f, %.4f", stats.acessos, hitRate, missRate, compMissRate, capMissRate, confMissRate);
+    }
 }
 
-uint32_t reverseAddress(int address) {
-    uint32_t mask = 0xff000000;
-    uint32_t reversed = 0;
+int randInt(int max){
+
+    return (rand() % max);
+}
+
+
+unsigned int reverseAddress(int address) {
+    unsigned int mask = 0xff000000;
+    unsigned int reversed = 0;
 
     reversed |= ((address<<(24))&mask);
     reversed |= ((address<<(8))&(mask>>(2*4)));
@@ -156,22 +208,4 @@ uint32_t reverseAddress(int address) {
     reversed |= ((address>>(24))&(mask>>(6*4)));
 
     return reversed;
-}
-
-void display ( int flag, CacheStats *cache ) {
-    if ( flag == 0 ) {
-        printf("Acessos = %d\n", cache->acessos);
-        printf("Taxa de hits = %.2f\n", (float)cache->hits / cache->acessos);
-        printf("Taxa de miss = %.2f\n", (float)cache->misses / cache->acessos);
-        printf("Taxa de miss compulsorio = %.2f\n", (float)cache->comp_misses / cache->acessos);
-        printf("Taxa de miss de capacidade = %.2f\n", (float)cache->cap_misses / cache->acessos);
-        printf("Taxa de miss de conflito = %.2f\n", (float)cache->conf_misses / cache->acessos);
-    } else if ( flag == 1 ) {
-        printf( "%d, %.2f, %.2f, %.2f, %.2f, %.2f\n", cache->acessos,
-               (float)cache->hits / cache->acessos,
-               (float)cache->misses / cache->acessos,
-               (float)cache->comp_misses / cache->acessos,
-               (float)cache->cap_misses / cache->acessos,
-               (float)cache->conf_misses / cache->acessos  );
-    }
 }
