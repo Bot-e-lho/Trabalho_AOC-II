@@ -87,6 +87,7 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
     Conj blocos;
     int ranIdx;
     int tagMissFlag = 1;
+    int isCacheFull = 1;
 
     cache.conjs = malloc(sizeof(Conj) * nsets); // nsets
     for (int i = 0; i < nsets; i++){
@@ -107,6 +108,7 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
     unsigned int address;
 
     while (fread(&address, 4, 1, arq) == 1){
+        isCacheFull = 1;
         tagMissFlag = 1;
         address = reverseAddress(address);
         TAG = address >> (numBitsOffset + numBitsIndex);
@@ -155,11 +157,24 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
                 ranIdx = randInt(assoc);
                 cache.conjs[IDX].blocos[ranIdx].tag = TAG;
                 stats->misses++;
-                if (nsets == 1){
+                if (nsets == 1){            // Total assoc só miss de capacidade
                     stats->cap_misses++;
                 }
                 else{
-                    stats->conf_misses++;
+                    for (int i = 0; i < nsets; i++){            // verificar se cache está cheia
+                        for (int j = 0; j < assoc; j++){
+                            if (cache.conjs[i].blocos[j].val == 0){
+                                isCacheFull = 0;
+                                break;
+                            }
+                        }
+                    }
+                    if (isCacheFull){
+                        stats->cap_misses++;       // Capacidade = cache cheia, else conflito
+                    }
+                    else{
+                        stats->conf_misses++;
+                    }
                 }
             }
         }
