@@ -9,6 +9,11 @@
 - `<flag_saida>`: Flag de saída (0 com labels, 1 para formato padrão).
 - `<arquivo_de_entrada>`: Arquivo de entrada contendo os endereços para acesso à cache.
 
+#### Testes da Política de Substituição Random
+
+##### Realizamos uma extensa série de testes para avaliar o desempenho e a eficácia da política de substituição Random implementada no simulador de cache. Todos os testes realizados para a política foram bem-sucedidos. Os resultados foram consistentes e em conformidade com o comportamento esperado da política.
+
+
 #### Para compilação, o padrão utilizado: gcc main.c -o cache_simulator -Wall -lm
 ##### Sobre a inclusão do "-lm", após a inserção da biblioteca math.h, foi necessário para compilação estar correta.
 
