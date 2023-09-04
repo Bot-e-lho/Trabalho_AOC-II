@@ -196,14 +196,14 @@ void printResults(int flag, CacheStats stats){
 
     if (flag == 0){
         printf("Acessos: %d\n", stats.acessos);
-        printf("Taxa de Hits: %.2f\n", hitRate);
-        printf("Taxa de Misses: %.2f\n", missRate);
+        printf("Taxa de Hits: %.4f\n", hitRate);
+        printf("Taxa de Misses: %.4f\n", missRate);
         printf("Taxa de Misses Compulsorios: %.2f\n", compMissRate);
         printf("Taxa de Misses Capacidade: %.2f\n", capMissRate);
         printf("Taxa de Misses Conflito: %.2f\n", confMissRate);
     }
     else{
-        printf("%d, %.4f, %.4f, %.4f, %.4f, %.4f", stats.acessos, hitRate, missRate, compMissRate, capMissRate, confMissRate);
+        printf("%d, %.4f, %.4f, %.2f, %.2f, %.2f", stats.acessos, hitRate, missRate, compMissRate, capMissRate, confMissRate);
     }
 }
 
