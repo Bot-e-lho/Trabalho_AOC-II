@@ -87,7 +87,8 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
     Conj blocos;
     int ranIdx;
     int tagMissFlag = 1;
-    int isCacheFull = 1;
+    int valCount = 0;
+    int blockAmount = nsets * assoc;
 
     cache.conjs = malloc(sizeof(Conj) * nsets); // nsets
     for (int i = 0; i < nsets; i++){
@@ -108,7 +109,6 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
     unsigned int address;
 
     while (fread(&address, 4, 1, arq) == 1){
-        isCacheFull = 1;
         tagMissFlag = 1;
         address = reverseAddress(address);
         TAG = address >> (numBitsOffset + numBitsIndex);
@@ -146,6 +146,7 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
                 else{   // Validade = 0, primeira validade 0, para direita está tudo 0 também
                     stats->comp_misses++;
                     stats->misses++;
+                    valCount++;
                     cache.conjs[IDX].blocos[i].val = 1;
                     cache.conjs[IDX].blocos[i].tag = TAG;
                     tagMissFlag = 0;
@@ -161,16 +162,8 @@ void loadAdresses(Cache cache, int nsets, int assoc, char *file, int numBitsOffs
                     stats->cap_misses++;
                 }
                 else{
-                    for (int i = 0; i < nsets; i++){            // verificar se cache está cheia
-                        for (int j = 0; j < assoc; j++){
-                            if (cache.conjs[i].blocos[j].val == 0){
-                                isCacheFull = 0;
-                                break;
-                            }
-                        }
-                    }
-                    if (isCacheFull){
-                        stats->cap_misses++;       // Capacidade = cache cheia, else conflito
+                    if (valCount == blockAmount){       // cache cheia
+                        stats->cap_misses++;
                     }
                     else{
                         stats->conf_misses++;
@@ -203,7 +196,7 @@ void printResults(int flag, CacheStats stats){
         printf("Taxa de Misses Conflito: %.2f\n", confMissRate);
     }
     else{
-        printf("%d, %.4f, %.4f, %.2f, %.2f, %.2f", stats.acessos, hitRate, missRate, compMissRate, capMissRate, confMissRate);
+        printf("%d %.4f %.4f %.2f %.2f %.2f", stats.acessos, hitRate, missRate, compMissRate, capMissRate, confMissRate);
     }
 }
 
